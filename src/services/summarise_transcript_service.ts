@@ -2,7 +2,10 @@ import "dotenv/config";
 import { z } from "zod";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { StructuredOutputParser } from "@langchain/core/output_parsers";
+import {
+  StructuredOutputParser,
+  StringOutputParser,
+} from "@langchain/core/output_parsers";
 
 const model = new ChatGoogleGenerativeAI({
   model: "gemini-2.5-flash",
@@ -48,39 +51,28 @@ export async function summarizeTranscript(
     " Also scale the number of key points accordingly. DO NOT MISS OUT IMPORTANT KEY POINTS JUST IT CONCISE";
 
   const prompt = ChatPromptTemplate.fromTemplate(`
-    You are an expert video summarizer.
-    You must return ONLY a valid JSON object with no markdown formatting, no code blocks, and no additional text.
-    The transcript length is approximately ${wordCount} words.
-    ${summaryInstructions}
+    You are an expert summarizer. 
+    Return ONLY a valid JSON object. 
+    No explanations. No markdown. No code fences.
 
-    Given the transcript below, write the summary accordingly
-    and extract the most important key points.
+    JSON schema:
+    {{
+      "summary": "string",
+      "keyPoints": ["string", "string", ...]
+    }}
+
+    Transcript length: ${wordCount} words.
+    Instructions: ${summaryInstructions}
 
     Transcript:
     ---------------
     {transcript}
     ---------------
 
-    Do NOT include:
-    - Markdown code blocks (\`\`\`json or \`\`\`)
-    - Any text before or after the JSON
-    - Escaped quotes within the JSON structure
+    Return only valid JSON
+`);
 
-    {{
-      "summary": "Full summary text...",
-      "keyPoints": [
-        "point 1...",
-        "point 2...",
-        "point 3...",
-        "and so on..."
-      ]
-    }}
-
-
-    Return only the JSON object:
-  `);
-
-  const chain = prompt.pipe(model).pipe(parser);
+  const chain = prompt.pipe(model).pipe(new StringOutputParser()).pipe(parser);
 
   const response = await chain.invoke({
     transcript,
